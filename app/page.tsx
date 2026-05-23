@@ -123,6 +123,15 @@ export default function Home() {
 
       <div className="max-w-md w-full space-y-8">
         
+{/* 📸 [여기 추가] 메인 사진 추가 영역 */}
+      <div className="w-full h-48 relative rounded-2xl overflow-hidden shadow-sm">
+        <img 
+          src="/main.jpg"  // public 폴더에 넣은 이미지 파일명을 여기에 적어주세요!
+          alt="Main Visual"
+          className="w-full h-full object-cover" // 이미지가 틀에 꽉 차고 예쁘게 잘리도록 설정
+        />
+      </div>
+
         {/* 헤더 전체 변경 */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">{t.title}</h1>
