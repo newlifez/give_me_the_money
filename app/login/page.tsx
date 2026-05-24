@@ -3,39 +3,37 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "../LanguageContext"; // 💡 훅 가져오기
 
-// 🌐 1. 로그인 페이지 전용 다국어 사전 정의
+// 🌐 로그인용 다국어 사전
 const translations = {
   ko: {
     title: "용돈 관리",
     subtitle: "나만의 스마트 용돈 기록장 🐷",
-    placeholderId: "아이디",
+    placeholderId: "이메일 또는 아이디",
     placeholderPw: "비밀번호",
     btnLogin: "로그인",
     btnLoading: "로그인 중... 🐷",
     noAccount: "아직 계정이 없으신가요?",
     btnSignup: "회원가입",
-    errorAuth: "아이디 또는 비밀번호가 올바르지 않아요 😢",
-    currencySign: "₩", // 한국어일 땐 원화 기호
+    errorAuth: "아이디 또는 비밀번호를 다시 확인해 주세요 😢",
     langBtn: "🇯🇵 日本語"
   },
   ja: {
     title: "おこづかい管理",
-    subtitle: "自分だけのスマートおこづかい帳 🐷",
-    placeholderId: "ユーザーID",
+    subtitle: "スマートなおこづかい帳 🐷",
+    placeholderId: "メールアドレスまたはID",
     placeholderPw: "パスワード",
     btnLogin: "ログイン",
     btnLoading: "ログイン中... 🐷",
     noAccount: "アカウントをお持ちでないですか？",
     btnSignup: "新規登録",
-    errorAuth: "IDまたはパスワードが正しくありません 😢",
-    currencySign: "¥", // 일본어일 땐 엔화 기호
+    errorAuth: "IDまたはパスワードをもう一度ご確認ください 😢",
     langBtn: "🇰🇷 한국어"
   }
 };
 
-// 📸 돼지저금통 일러스트 (화폐 기호를 동적으로 받도록 수정)
-function PiggyBankIllustration({ sign }: { sign: string }) {
+function PiggyBankIllustration() {
   return (
     <svg viewBox="0 0 220 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
       <ellipse cx="110" cy="118" rx="72" ry="62" fill="#FFB74D" />
@@ -55,8 +53,7 @@ function PiggyBankIllustration({ sign }: { sign: string }) {
       <path d="M40 110 Q24 96 32 80 Q40 64 28 54" stroke="#FF8A65" strokeWidth="5" strokeLinecap="round" fill="none" />
       <circle cx="166" cy="52" r="18" fill="#FFC107" />
       <circle cx="166" cy="52" r="14" fill="#FFD54F" />
-      {/* 🪙 언어에 따라 ₩ 기호와 ¥ 기호가 바뀝니다! */}
-      <text x="166" y="58" textAnchor="middle" fill="#E65100" fontSize="14" fontWeight="bold" fontFamily="sans-serif">{sign}</text>
+      <text x="166" y="58" textAnchor="middle" fill="#E65100" fontSize="14" fontWeight="bold" fontFamily="sans-serif">₩</text>
       <circle cx="48" cy="56" r="4" fill="#FFC107" />
       <circle cx="190" cy="80" r="3" fill="#FF7043" />
       <circle cx="52" cy="148" r="3" fill="#FFC107" />
@@ -64,48 +61,87 @@ function PiggyBankIllustration({ sign }: { sign: string }) {
   );
 }
 
+const inputStyle = {
+  background: "#ffffff",
+  border: "2px solid #FFE0B2",
+  color: "#2D2015",
+  fontFamily: "var(--font-body)",
+  fontWeight: 600,
+  boxShadow: "0 2px 8px rgba(255, 112, 67, 0.08)",
+} as React.CSSProperties;
+
+function InputField({
+  icon,
+  type = "text",
+  placeholder,
+  value,
+  onChange,
+}: {
+  icon: string;
+  type?: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div className="relative">
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg select-none">{icon}</span>
+      <input
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required
+        className="w-full pl-11 pr-4 py-4 rounded-2xl text-base outline-none transition-all duration-200"
+        style={{
+          ...inputStyle,
+          border: focused ? "2px solid #FF7043" : "2px solid #FFE0B2",
+          boxShadow: focused
+            ? "0 0 0 4px rgba(255, 112, 67, 0.12)"
+            : "0 2px 8px rgba(255, 112, 67, 0.08)",
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // 🌐 언어 상태 추가 (기본값: 한국어)
-  const [lang, setLang] = useState<'ko' | 'ja'>('ko');
+  // 💡 전역 언어 상태 연결
+  const { lang, toggleLanguage } = useLanguage();
   const t = translations[lang];
 
-  const [id, setId] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const toggleLanguage = () => {
-    setLang((prev) => (prev === 'ko' ? 'ja' : 'ko'));
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    const emailFormatId = email.includes("@") ? email : `${email}@internal.com`;
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: emailFormatId,
+      password: password,
+    });
+
+    if (authError) {
+      setError(t.errorAuth);
+      setIsLoading(false);
+      return;
+    }
+
+    router.push("/dashboard");
+    router.refresh();
   };
-
-// app/login/page.tsx 내부의 handleLogin 함수 수정 부분
-
-const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
-  setError(null);
-
-  const emailFormatId = id.includes("@") ? id : `${id}@internal.com`;
-
-  // 내장 Auth가 계정을 검증합니다.
-  const { error } = await supabase.auth.signInWithPassword({
-    email: emailFormatId,
-    password: password,
-  });
-
-  if (error) {
-    setError(t.errorAuth);
-    setIsLoading(false);
-    return;
-  }
-
-  // 로그인 성공 시 대시보드로 이동!
-  router.push("/dashboard");
-  router.refresh();
-};
 
   return (
     <main
@@ -115,7 +151,6 @@ const handleLogin = async (e: React.FormEvent) => {
         fontFamily: "var(--font-body)",
       }}
     >
-      {/* 🌐 우측 상단 언어 전환 토글 버튼 */}
       <div className="absolute top-6 right-6">
         <button
           onClick={toggleLanguage}
@@ -127,7 +162,6 @@ const handleLogin = async (e: React.FormEvent) => {
       </div>
 
       <div className="w-full max-w-sm px-6 py-10 flex flex-col items-center">
-        {/* 헤더 타이틀 & 서브타이틀 */}
         <h1
           className="text-3xl font-extrabold text-center mb-1 tracking-tight"
           style={{ fontFamily: "var(--font-display)", color: "#E65100" }}
@@ -138,7 +172,6 @@ const handleLogin = async (e: React.FormEvent) => {
           {t.subtitle}
         </p>
 
-        {/* 일러스트 영역 */}
         <div
           className="w-48 h-40 mb-8 rounded-3xl flex items-center justify-center"
           style={{
@@ -146,8 +179,7 @@ const handleLogin = async (e: React.FormEvent) => {
             boxShadow: "0 8px 32px rgba(255, 112, 67, 0.15)",
           }}
         >
-          {/* 화폐 기호 프롭스 전달 */}
-          <PiggyBankIllustration sign={t.currencySign} />
+          <PiggyBankIllustration />
         </div>
 
         {error && (
@@ -160,57 +192,15 @@ const handleLogin = async (e: React.FormEvent) => {
         )}
 
         <form onSubmit={handleLogin} className="w-full flex flex-col gap-4">
-          {/* ID 입력창 */}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg select-none">👤</span>
-            <input
-              type="text"
-              placeholder={t.placeholderId}
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-              required
-              className="w-full pl-11 pr-4 py-4 rounded-2xl text-base outline-none transition-all duration-200 focus:ring-2 focus:ring-orange-300"
-              style={{
-                background: "#ffffff",
-                border: "2px solid #FFE0B2",
-                color: "#2D2015",
-                fontFamily: "var(--font-body)",
-                fontWeight: 600,
-                boxShadow: "0 2px 8px rgba(255, 112, 67, 0.08)",
-              }}
-            />
-          </div>
+          <InputField icon="👤" placeholder={t.placeholderId} value={email} onChange={setEmail} />
+          <InputField icon="🔒" type="password" placeholder={t.placeholderPw} value={password} onChange={setPassword} />
 
-          {/* 비밀번호 입력창 */}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg select-none">🔒</span>
-            <input
-              type="password"
-              placeholder={t.placeholderPw}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full pl-11 pr-4 py-4 rounded-2xl text-base outline-none transition-all duration-200 focus:ring-2 focus:ring-orange-300"
-              style={{
-                background: "#ffffff",
-                border: "2px solid #FFE0B2",
-                color: "#2D2015",
-                fontFamily: "var(--font-body)",
-                fontWeight: 600,
-                boxShadow: "0 2px 8px rgba(255, 112, 67, 0.08)",
-              }}
-            />
-          </div>
-
-          {/* 로그인 제출 버튼 */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-4 rounded-2xl text-lg font-bold text-white mt-2 transition-all duration-200 active:scale-95 hover:-translate-y-0.5"
+            className="w-full py-4 rounded-2xl text-lg font-bold text-white mt-2 transition-all duration-200 active:scale-95"
             style={{
-              background: isLoading
-                ? "#FFAB91"
-                : "linear-gradient(135deg, #FF7043 0%, #FF5722 100%)",
+              background: isLoading ? "#FFAB91" : "linear-gradient(135deg, #FF7043 0%, #FF5722 100%)",
               fontFamily: "var(--font-display)",
               boxShadow: isLoading ? "none" : "0 6px 20px rgba(255, 87, 34, 0.35)",
               cursor: isLoading ? "not-allowed" : "pointer",
@@ -220,24 +210,15 @@ const handleLogin = async (e: React.FormEvent) => {
           </button>
         </form>
 
-        {/* 하단 회원가입 유도 영역 */}
         <div className="mt-6 flex items-center gap-2">
-          <span className="text-sm" style={{ color: "#BCAAA4" }}>
-            {t.noAccount}
-          </span>
-          <a
-            href="/signup"
-            className="text-sm font-bold underline underline-offset-2 transition-colors duration-150"
+          <span className="text-sm" style={{ color: "#BCAAA4" }}>{t.noAccount}</span>
+          <button
+            onClick={() => router.push("/signup")}
+            className="text-sm font-bold underline underline-offset-2"
             style={{ color: "#FF7043" }}
           >
             {t.btnSignup}
-          </a>
-        </div>
-
-        <div className="mt-10 flex gap-3 opacity-40 select-none">
-          <span className="text-2xl">🪙</span>
-          <span className="text-2xl">💰</span>
-          <span className="text-2xl">🪙</span>
+          </button>
         </div>
       </div>
     </main>
